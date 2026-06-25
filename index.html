@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>스마트 한자 뷰어</title>
+    <title>스마트 교재 뷰어</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; background-color: #333; font-family: sans-serif; }
         .app-layout { display: flex; flex-direction: column; height: 100%; }
         
-        .top-toolbar { display: flex; flex-wrap: nowrap; justify-content: space-evenly; align-items: center; gap: 4px; padding: 8px 4px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
+        /* [요청 2] 상단 메뉴들이 넓게 퍼지지 않고 가운데로 깔끔하게 모이도록 'justify-content: center'로 변경 */
+        .top-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 8px; padding: 10px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
         
-        .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 6px; padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
+        /* 하단 메뉴도 이전/다음 버튼만 깔끔하게 남겼습니다 */
+        .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 15px; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
         
         .canvas-scroll-area { flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background-color: #e2e6ea; }
         
@@ -20,12 +22,18 @@
         #pdf-canvas { display: block; }
         #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; } 
 
-        button { padding: 6px 10px; font-size: 13px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s;}
+        button { padding: 6px 12px; font-size: 14px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s;}
         button:active { background: #dcdde1; }
-        select { padding: 6px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white;}
-        .page-info { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 4px; }
-        .page-info input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 35px; text-align: center; font-size: 13px;}
         
+        /* 과목/단계 선택창 디자인 최적화 */
+        select { padding: 6px 10px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white; cursor: pointer;}
+        
+        .page-info { font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        .page-info input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 40px; text-align: center; font-size: 14px;}
+        
+        /* 메뉴 사이를 구분해주는 세로선 디자인 */
+        .divider { width: 1px; height: 24px; background-color: #ccc; margin: 0 2px; }
+
         #toggle-draw { border: 2px solid #ccc; background: #ffeaa7; color: #333; }
         #capture-btn { background: #74b9ff; color: white; border: none; }
     </style>
@@ -35,6 +43,18 @@
 <div class="app-layout">
     
     <div class="top-toolbar">
+        <select id="subject-selector">
+            <option value="hanja">한자</option>
+            <option value="isu">이수</option>
+            <option value="english">영어</option>
+            <option value="science">과학</option>
+        </select>
+        
+        <select id="stage-selector">
+            </select>
+
+        <div class="divider"></div>
+
         <button id="toggle-draw">판서 OFF</button>
         <button id="undo-draw">되돌리기</button>
         <button id="capture-btn">캡처</button>
@@ -48,17 +68,6 @@
     </div>
 
     <div class="bottom-toolbar">
-        <select id="pdf-selector">
-            <option value="./hanja-a.pdf">한자 A</option>
-            <option value="./hanja-b.pdf">한자 B</option>
-            <option value="./hanja-c.pdf">한자 C</option>
-            <option value="./hanja-d1.pdf">한자 D1</option>
-            <option value="./hanja-d2.pdf">한자 D2</option>
-            <option value="./hanja-e1.pdf">한자 E1</option>
-            <option value="./hanja-e2.pdf">한자 E2</option>
-            <option value="./hanja-f1.pdf">한자 F1</option>
-            <option value="./hanja-f2.pdf">한자 F2</option>
-        </select>
         <button id="prev-page">◀ 이전</button>
         <div class="page-info">
             <input type="number" id="page-num" value="1"> / <span id="page-count">0</span>
@@ -69,6 +78,34 @@
 </div>
 
 <script>
+    // [요청 3] 과목별로 단계를 관리하는 데이터베이스(수첩)입니다. 
+    // 나중에 교재가 추가되면 이 부분만 수정하시면 됩니다!
+    const subjectData = {
+        "hanja": [
+            { name: "A 단계", url: "./hanja-a.pdf" },
+            { name: "B 단계", url: "./hanja-b.pdf" },
+            { name: "C 단계", url: "./hanja-c.pdf" },
+            { name: "D1 단계", url: "./hanja-d1.pdf" },
+            { name: "D2 단계", url: "./hanja-d2.pdf" },
+            { name: "E1 단계", url: "./hanja-e1.pdf" },
+            { name: "E2 단계", url: "./hanja-e2.pdf" },
+            { name: "F1 단계", url: "./hanja-f1.pdf" },
+            { name: "F2 단계", url: "./hanja-f2.pdf" }
+        ],
+        "isu": [
+            { name: "A 단계", url: "./isu-a.pdf" },
+            { name: "B 단계", url: "./isu-b.pdf" }
+        ],
+        "english": [
+            { name: "A 단계", url: "./english-a.pdf" },
+            { name: "B 단계", url: "./english-b.pdf" }
+        ],
+        "science": [
+            { name: "1단계", url: "./science-1.pdf" },
+            { name: "2단계", url: "./science-2.pdf" }
+        ]
+    };
+
     let pdfDoc = null, pageNum = 1;
     let currentScale = 1.0; 
     let initialFitDone = false; 
@@ -78,12 +115,27 @@
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
     const scrollArea = document.getElementById('scroll-area');
+    const subjectSelector = document.getElementById('subject-selector');
+    const stageSelector = document.getElementById('stage-selector');
     
     let isDrawing = false;
     let drawMode = false;
     let undoStack = [];
 
     function saveState() { undoStack.push(drawCanvas.toDataURL()); }
+
+    // [핵심 기능] 과목을 선택하면 해당 과목의 '단계' 목록을 새로 만들어주는 함수
+    function updateStageList(subjectKey) {
+        stageSelector.innerHTML = ''; // 기존 목록 싹 지우기
+        const stages = subjectData[subjectKey];
+        
+        stages.forEach(stage => {
+            const option = document.createElement('option');
+            option.value = stage.url;
+            option.textContent = stage.name;
+            stageSelector.appendChild(option);
+        });
+    }
 
     function loadPDF(pdfUrl) {
         pageNum = 1; 
@@ -95,7 +147,7 @@
             document.getElementById('page-count').textContent = pdfDoc.numPages;
             renderPage(pageNum);
         }).catch(error => {
-            alert("PDF 파일을 찾을 수 없습니다.");
+            alert(`"${pdfUrl}" 파일을 찾을 수 없습니다. 깃허브에 해당 PDF 파일을 업로드 해주세요!`);
         });
     }
 
@@ -132,10 +184,22 @@
         if(pdfDoc) renderPage(pageNum);
     });
 
-    const selector = document.getElementById('pdf-selector');
-    loadPDF(selector.value);
+    // --- 초기 실행 셋팅 ---
+    updateStageList(subjectSelector.value); // 처음에 '한자' 단계 목록 채우기
+    loadPDF(stageSelector.value); // 채워진 첫 번째 PDF 불러오기
 
-    selector.addEventListener('change', (e) => { loadPDF(e.target.value); });
+    // 과목(1차 메뉴)을 바꿨을 때
+    subjectSelector.addEventListener('change', (e) => { 
+        updateStageList(e.target.value); // 단계 목록을 새 과목으로 교체
+        loadPDF(stageSelector.value); // 바뀐 과목의 첫 번째 PDF 열기
+    });
+
+    // 단계(2차 메뉴)를 바꿨을 때
+    stageSelector.addEventListener('change', (e) => { 
+        loadPDF(e.target.value); 
+    });
+
+    // 페이지 이동 버튼
     document.getElementById('prev-page').addEventListener('click', () => { if (pageNum <= 1) return; pageNum--; renderPage(pageNum); clearDrawing(); });
     document.getElementById('next-page').addEventListener('click', () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); clearDrawing(); });
     document.getElementById('page-num').addEventListener('change', (e) => {
@@ -187,7 +251,10 @@
         tempCtx.drawImage(drawCanvas, 0, 0);
 
         const link = document.createElement('a');
-        link.download = `교재_캡처.png`;
+        const currentSubject = subjectSelector.options[subjectSelector.selectedIndex].text;
+        const currentStage = stageSelector.options[stageSelector.selectedIndex].text;
+        
+        link.download = `${currentSubject}_${currentStage}_${pageNum}페이지.png`;
         link.href = tempCanvas.toDataURL('image/png');
         link.click();
     });
