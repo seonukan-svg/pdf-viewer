@@ -7,32 +7,71 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
+        /* [핵심 1] 모든 요소가 화면 너비(100%)를 절대 넘지 않도록 테두리 계산법을 통일합니다 */
+        * { box-sizing: border-box; } 
+        
         body, html { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; background-color: #333; font-family: sans-serif; }
-        .app-layout { display: flex; flex-direction: column; height: 100%; }
+        .app-layout { display: flex; flex-direction: column; height: 100%; width: 100%; }
         
-        /* [요청 2] 상단 메뉴들이 넓게 퍼지지 않고 가운데로 깔끔하게 모이도록 'justify-content: center'로 변경 */
-        .top-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 8px; padding: 10px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
+        /* [핵심 2] justify-content: space-between 으로 버튼들을 양옆으로 고르게 퍼트리고 스크롤을 차단합니다 */
+        .top-toolbar { 
+            display: flex; 
+            flex-wrap: nowrap; 
+            justify-content: space-between; 
+            align-items: center; 
+            gap: 3px; 
+            padding: 8px 4px; 
+            width: 100%; 
+            background: #ffffff; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+            z-index: 10; 
+            flex-shrink: 0; 
+            overflow: hidden; 
+        }
         
-        /* 하단 메뉴도 이전/다음 버튼만 깔끔하게 남겼습니다 */
-        .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 15px; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
+        .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 15px; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); width: 100%; background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; }
         
-        .canvas-scroll-area { flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background-color: #e2e6ea; }
+        .canvas-scroll-area { flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background-color: #e2e6ea; width: 100%; }
         
         .canvas-wrapper { position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); background: white; margin: auto; }
         #pdf-canvas { display: block; }
         #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; } 
 
-        button { padding: 6px 12px; font-size: 14px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s;}
+        /* [핵심 3] 모바일 한 줄 핏팅을 위해 버튼 사이즈, 폰트, 자간을 초정밀하게 줄였습니다 */
+        button { 
+            padding: 6px 6px; 
+            font-size: 12px; 
+            letter-spacing: -0.5px; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            border: 1px solid #ccc; 
+            background: #f8f9fa; 
+            font-weight: bold; 
+            transition: 0.2s;
+            flex-shrink: 1; 
+            white-space: nowrap; 
+            min-width: 0;
+        }
         button:active { background: #dcdde1; }
         
-        /* 과목/단계 선택창 디자인 최적화 */
-        select { padding: 6px 10px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white; cursor: pointer;}
+        select { 
+            padding: 6px 2px; 
+            font-size: 12px; 
+            letter-spacing: -0.5px;
+            border-radius: 6px; 
+            border: 1px solid #ccc; 
+            font-weight: bold; 
+            background: white; 
+            cursor: pointer;
+            flex-shrink: 1;
+            min-width: 0;
+            text-overflow: ellipsis;
+        }
         
         .page-info { font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
         .page-info input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 40px; text-align: center; font-size: 14px;}
         
-        /* 메뉴 사이를 구분해주는 세로선 디자인 */
-        .divider { width: 1px; height: 24px; background-color: #ccc; margin: 0 2px; }
+        .divider { width: 1px; height: 20px; background-color: #ccc; margin: 0 1px; flex-shrink: 0; }
 
         #toggle-draw { border: 2px solid #ccc; background: #ffeaa7; color: #333; }
         #capture-btn { background: #74b9ff; color: white; border: none; }
@@ -41,7 +80,6 @@
 <body>
 
 <div class="app-layout">
-    
     <div class="top-toolbar">
         <select id="subject-selector">
             <option value="hanja">한자</option>
@@ -50,8 +88,7 @@
             <option value="science">과학</option>
         </select>
         
-        <select id="stage-selector">
-            </select>
+        <select id="stage-selector"></select>
 
         <div class="divider"></div>
 
@@ -74,12 +111,9 @@
         </div>
         <button id="next-page">다음 ▶</button>
     </div>
-
 </div>
 
 <script>
-    // [요청 3] 과목별로 단계를 관리하는 데이터베이스(수첩)입니다. 
-    // 나중에 교재가 추가되면 이 부분만 수정하시면 됩니다!
     const subjectData = {
         "hanja": [
             { name: "A 단계", url: "./hanja-a.pdf" },
@@ -92,18 +126,9 @@
             { name: "F1 단계", url: "./hanja-f1.pdf" },
             { name: "F2 단계", url: "./hanja-f2.pdf" }
         ],
-        "isu": [
-            { name: "A 단계", url: "./isu-a.pdf" },
-            { name: "B 단계", url: "./isu-b.pdf" }
-        ],
-        "english": [
-            { name: "A 단계", url: "./english-a.pdf" },
-            { name: "B 단계", url: "./english-b.pdf" }
-        ],
-        "science": [
-            { name: "1단계", url: "./science-1.pdf" },
-            { name: "2단계", url: "./science-2.pdf" }
-        ]
+        "isu": [ { name: "A 단계", url: "./isu-a.pdf" }, { name: "B 단계", url: "./isu-b.pdf" } ],
+        "english": [ { name: "A 단계", url: "./english-a.pdf" }, { name: "B 단계", url: "./english-b.pdf" } ],
+        "science": [ { name: "1단계", url: "./science-1.pdf" }, { name: "2단계", url: "./science-2.pdf" } ]
     };
 
     let pdfDoc = null, pageNum = 1;
@@ -124,11 +149,9 @@
 
     function saveState() { undoStack.push(drawCanvas.toDataURL()); }
 
-    // [핵심 기능] 과목을 선택하면 해당 과목의 '단계' 목록을 새로 만들어주는 함수
     function updateStageList(subjectKey) {
-        stageSelector.innerHTML = ''; // 기존 목록 싹 지우기
+        stageSelector.innerHTML = ''; 
         const stages = subjectData[subjectKey];
-        
         stages.forEach(stage => {
             const option = document.createElement('option');
             option.value = stage.url;
@@ -158,48 +181,42 @@
             if (!initialFitDone) {
                 const availableWidth = scrollArea.clientWidth;
                 const availableHeight = scrollArea.clientHeight;
-                
                 const scaleWidth = availableWidth / baseViewport.width;
                 const scaleHeight = availableHeight / baseViewport.height;
                 currentScale = Math.min(scaleWidth, scaleHeight) * 0.98; 
-                
                 initialFitDone = true; 
             }
 
             const viewport = page.getViewport({ scale: currentScale });
-            
-            pdfCanvas.height = viewport.height;
-            pdfCanvas.width = viewport.width;
-            drawCanvas.height = viewport.height;
-            drawCanvas.width = viewport.width;
+            const outputScale = window.devicePixelRatio || 1;
 
-            page.render({ canvasContext: ctx, viewport: viewport });
+            pdfCanvas.width = Math.floor(viewport.width * outputScale);
+            pdfCanvas.height = Math.floor(viewport.height * outputScale);
+            drawCanvas.width = Math.floor(viewport.width * outputScale);
+            drawCanvas.height = Math.floor(viewport.height * outputScale);
+
+            pdfCanvas.style.width = Math.floor(viewport.width) + "px";
+            pdfCanvas.style.height = Math.floor(viewport.height) + "px";
+            drawCanvas.style.width = Math.floor(viewport.width) + "px";
+            drawCanvas.style.height = Math.floor(viewport.height) + "px";
+
+            const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+
+            page.render({ canvasContext: ctx, transform: transform, viewport: viewport });
+            drawCtx.scale(outputScale, outputScale);
+
             document.getElementById('page-num').value = num;
             undoStack = [];
         });
     }
 
-    window.addEventListener('resize', () => {
-        initialFitDone = false;
-        if(pdfDoc) renderPage(pageNum);
-    });
+    window.addEventListener('resize', () => { initialFitDone = false; if(pdfDoc) renderPage(pageNum); });
 
-    // --- 초기 실행 셋팅 ---
-    updateStageList(subjectSelector.value); // 처음에 '한자' 단계 목록 채우기
-    loadPDF(stageSelector.value); // 채워진 첫 번째 PDF 불러오기
+    updateStageList(subjectSelector.value); 
+    loadPDF(stageSelector.value); 
 
-    // 과목(1차 메뉴)을 바꿨을 때
-    subjectSelector.addEventListener('change', (e) => { 
-        updateStageList(e.target.value); // 단계 목록을 새 과목으로 교체
-        loadPDF(stageSelector.value); // 바뀐 과목의 첫 번째 PDF 열기
-    });
-
-    // 단계(2차 메뉴)를 바꿨을 때
-    stageSelector.addEventListener('change', (e) => { 
-        loadPDF(e.target.value); 
-    });
-
-    // 페이지 이동 버튼
+    subjectSelector.addEventListener('change', (e) => { updateStageList(e.target.value); loadPDF(stageSelector.value); });
+    stageSelector.addEventListener('change', (e) => { loadPDF(e.target.value); });
     document.getElementById('prev-page').addEventListener('click', () => { if (pageNum <= 1) return; pageNum--; renderPage(pageNum); clearDrawing(); });
     document.getElementById('next-page').addEventListener('click', () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); clearDrawing(); });
     document.getElementById('page-num').addEventListener('change', (e) => {
@@ -207,7 +224,6 @@
         if(requestedPage >= 1 && requestedPage <= pdfDoc.numPages) { pageNum = requestedPage; renderPage(pageNum); clearDrawing(); }
     });
     
-    // 판서 ON/OFF
     const toggleBtn = document.getElementById('toggle-draw');
     toggleBtn.addEventListener('click', () => {
         drawMode = !drawMode;
@@ -226,22 +242,25 @@
         }
     });
 
-    function clearDrawing() { drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); undoStack = []; }
+    function clearDrawing() { 
+        const outputScale = window.devicePixelRatio || 1;
+        drawCtx.clearRect(0, 0, drawCanvas.width / outputScale, drawCanvas.height / outputScale); 
+        undoStack = []; 
+    }
 
-    // 되돌리기
     document.getElementById('undo-draw').addEventListener('click', () => {
         if (undoStack.length > 0) {
             undoStack.pop(); 
-            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
+            const outputScale = window.devicePixelRatio || 1;
+            drawCtx.clearRect(0, 0, drawCanvas.width / outputScale, drawCanvas.height / outputScale); 
             if (undoStack.length > 0) {
                 let img = new Image();
-                img.onload = () => { drawCtx.drawImage(img, 0, 0); };
+                img.onload = () => { drawCtx.drawImage(img, 0, 0, drawCanvas.width / outputScale, drawCanvas.height / outputScale); };
                 img.src = undoStack[undoStack.length - 1];
             }
         }
     });
 
-    // 캡처 다운로드
     document.getElementById('capture-btn').addEventListener('click', () => {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = pdfCanvas.width;
@@ -259,7 +278,6 @@
         link.click();
     });
 
-    // --- 그리기 이벤트 ---
     drawCanvas.addEventListener('mousedown', (e) => { if (!drawMode) return; isDrawing = true; drawCtx.beginPath(); drawCtx.moveTo(e.offsetX, e.offsetY); drawCtx.strokeStyle = 'red'; drawCtx.lineCap = 'round'; drawCtx.lineWidth = 4; });
     drawCanvas.addEventListener('mousemove', (e) => { if (isDrawing && drawMode) { drawCtx.lineTo(e.offsetX, e.offsetY); drawCtx.stroke(); } });
     drawCanvas.addEventListener('mouseup', () => { if(isDrawing) { isDrawing = false; saveState(); } });
