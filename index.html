@@ -7,34 +7,30 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
-        /* 화면을 실제 앱처럼 꽉 차게 만들고 스크롤은 중간 영역에서만 되도록 수정 */
-        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background-color: #e2e6ea; font-family: sans-serif; }
+        body, html { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; background-color: #333; font-family: sans-serif; }
+        .app-layout { display: flex; flex-direction: column; height: 100%; }
         
-        /* [핵심 수정 1] 100vh 대신 100%와 100dvh를 사용하여 스마트폰 주소창을 제외한 '진짜' 화면 크기에 맞춥니다 */
-        .app-layout { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+        /* [요청 1] 상단 메뉴가 무조건 한 줄로 나오도록 수정 (nowrap) */
+        .top-toolbar { display: flex; flex-wrap: nowrap; justify-content: space-evenly; align-items: center; gap: 4px; padding: 8px 4px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
         
-        /* [핵심 수정 2] flex-shrink: 0; 을 추가하여 상/하단 메뉴바가 화면 밖으로 밀려나지 않게 단단히 고정합니다 */
-        .top-toolbar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; padding: 10px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 10; flex-shrink: 0; }
+        .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 6px; padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
         
-        /* [핵심 수정 3] 아이폰 하단의 '홈바(Safe Area)' 영역과 겹치지 않도록 안전 여백(env)을 추가했습니다 */
-        .bottom-toolbar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.1); z-index: 10; flex-shrink: 0; }
+        /* [요청 4] 스크롤 영역 안에서 교재가 항상 한가운데 오도록 정렬 방식을 추가했습니다 */
+        .canvas-scroll-area { flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background-color: #e2e6ea; }
         
-        .canvas-scroll-area { flex-grow: 1; overflow: auto; text-align: center; }
-        
-        .canvas-wrapper { position: relative; display: inline-block; margin: 10px auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); background: white; }
+        .canvas-wrapper { position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); background: white; margin: auto; }
         #pdf-canvas { display: block; }
         #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; } 
 
-        /* 버튼 디자인 */
-        button { padding: 8px 12px; font-size: 14px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; white-space: nowrap; transition: 0.2s;}
+        /* [요청 3] 한 줄에 들어가도록 버튼 크기와 여백을 콤팩트하게 줄였습니다 */
+        button { padding: 6px 10px; font-size: 13px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s;}
         button:active { background: #dcdde1; }
-        select { padding: 8px; font-size: 15px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white;}
-        .page-info { font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
-        .page-info input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 40px; text-align: center; }
+        select { padding: 6px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white;}
+        .page-info { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 4px; }
+        .page-info input { padding: 4px; border: 1px solid #ccc; border-radius: 4px; width: 35px; text-align: center; font-size: 13px;}
         
         #toggle-draw { border: 2px solid #ccc; background: #ffeaa7; color: #333; }
         #capture-btn { background: #74b9ff; color: white; border: none; }
-        #capture-btn:active { background: #0984e3; }
     </style>
 </head>
 <body>
@@ -42,12 +38,10 @@
 <div class="app-layout">
     
     <div class="top-toolbar">
-        <button id="zoom-out">➖ 축소</button>
-        <button id="zoom-in">➕ 확대</button>
-        <button id="toggle-draw">🖌️ 판서: 꺼짐</button>
-        <button id="undo-draw">↩️ 실행취소</button>
-        <button id="clear-draw">🗑️ 전체지우기</button>
-        <button id="capture-btn">📸 화면 캡처</button>
+        <button id="zoom-in">확대</button>
+        <button id="toggle-draw">판서 OFF</button>
+        <button id="undo-draw">되돌리기</button>
+        <button id="capture-btn">캡처</button>
     </div>
 
     <div class="canvas-scroll-area" id="scroll-area">
@@ -59,17 +53,16 @@
 
     <div class="bottom-toolbar">
         <select id="pdf-selector">
-            <option value="./hanja-a.pdf">한자 A 단계</option>
-            <option value="./hanja-b.pdf">한자 B 단계</option>
-            <option value="./hanja-c.pdf">한자 C 단계</option>
-            <option value="./hanja-d1.pdf">한자 D1 단계</option>
-            <option value="./hanja-d2.pdf">한자 D2 단계</option>
-            <option value="./hanja-e1.pdf">한자 E1 단계</option>
-            <option value="./hanja-e2.pdf">한자 E2 단계</option>
-            <option value="./hanja-f1.pdf">한자 F1 단계</option>
-            <option value="./hanja-f2.pdf">한자 F2 단계</option>
+            <option value="./hanja-a.pdf">A 단계</option>
+            <option value="./hanja-b.pdf">B 단계</option>
+            <option value="./hanja-c.pdf">C 단계</option>
+            <option value="./hanja-d1.pdf">D1 단계</option>
+            <option value="./hanja-d2.pdf">D2 단계</option>
+            <option value="./hanja-e1.pdf">E1 단계</option>
+            <option value="./hanja-e2.pdf">E2 단계</option>
+            <option value="./hanja-f1.pdf">F1 단계</option>
+            <option value="./hanja-f2.pdf">F2 단계</option>
         </select>
-
         <button id="prev-page">◀ 이전</button>
         <div class="page-info">
             <input type="number" id="page-num" value="1"> / <span id="page-count">0</span>
@@ -88,17 +81,13 @@
     const ctx = pdfCanvas.getContext('2d');
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
+    const scrollArea = document.getElementById('scroll-area');
     
     let isDrawing = false;
     let drawMode = false;
-    
-    // [기능 3] 실행취소를 위해 이전 그림들을 기억할 배열(메모장)입니다.
     let undoStack = [];
 
-    function saveState() {
-        // 선을 하나 그을 때마다 그 순간의 투명판 상태를 사진 찍듯 저장합니다.
-        undoStack.push(drawCanvas.toDataURL());
-    }
+    function saveState() { undoStack.push(drawCanvas.toDataURL()); }
 
     function loadPDF(pdfUrl) {
         pageNum = 1; 
@@ -118,10 +107,16 @@
         pdfDoc.getPage(num).then(page => {
             const baseViewport = page.getViewport({ scale: 1 });
             
-            // 모바일 화면 너비에 맞춰 자동 비율 조정 (여백을 조금 줍니다)
+            // [요청 4] 상하단 메뉴 사이 공간을 100% 활용하여 딱 맞게 계산하는 마법식입니다.
             if (!initialFitDone) {
-                const screenWidth = document.getElementById('scroll-area').clientWidth;
-                currentScale = (screenWidth / baseViewport.width) * 0.95; 
+                const availableWidth = scrollArea.clientWidth;
+                const availableHeight = scrollArea.clientHeight;
+                
+                // 가로와 세로 중, 더 좁은 쪽을 기준으로 비율을 맞춥니다 (여백 2% 부여)
+                const scaleWidth = availableWidth / baseViewport.width;
+                const scaleHeight = availableHeight / baseViewport.height;
+                currentScale = Math.min(scaleWidth, scaleHeight) * 0.98; 
+                
                 initialFitDone = true; 
             }
 
@@ -134,17 +129,19 @@
 
             page.render({ canvasContext: ctx, viewport: viewport });
             document.getElementById('page-num').value = num;
-            
-            // 페이지가 바뀔 때마다 실행취소 목록도 초기화합니다.
             undoStack = [];
         });
     }
 
-    // 초기 실행
+    // [요청 5] 기기를 가로 모드로 돌리거나 창 크기가 변할 때, 화면 맞춤을 다시 계산합니다.
+    window.addEventListener('resize', () => {
+        initialFitDone = false;
+        if(pdfDoc) renderPage(pageNum);
+    });
+
     const selector = document.getElementById('pdf-selector');
     loadPDF(selector.value);
 
-    // 하단: 단계 이동 및 페이지 이동 버튼
     selector.addEventListener('change', (e) => { loadPDF(e.target.value); });
     document.getElementById('prev-page').addEventListener('click', () => { if (pageNum <= 1) return; pageNum--; renderPage(pageNum); clearDrawing(); });
     document.getElementById('next-page').addEventListener('click', () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); clearDrawing(); });
@@ -153,43 +150,36 @@
         if(requestedPage >= 1 && requestedPage <= pdfDoc.numPages) { pageNum = requestedPage; renderPage(pageNum); clearDrawing(); }
     });
     
-    // 상단: 확대/축소
+    // 확대 버튼 (한 번 누를 때마다 30%씩 커집니다)
     document.getElementById('zoom-in').addEventListener('click', () => { currentScale += 0.3; renderPage(pageNum); });
-    document.getElementById('zoom-out').addEventListener('click', () => { if(currentScale > 0.5) { currentScale -= 0.3; renderPage(pageNum); } });
 
-    // 상단: 판서 켜기/끄기 (디자인 변화 추가)
+    // 판서 ON/OFF
     const toggleBtn = document.getElementById('toggle-draw');
     toggleBtn.addEventListener('click', () => {
         drawMode = !drawMode;
         if(drawMode) {
-            toggleBtn.style.background = '#ff7675'; // 빨간색
+            toggleBtn.style.background = '#ff7675';
             toggleBtn.style.color = '#fff';
             toggleBtn.style.borderColor = '#d63031';
-            toggleBtn.innerHTML = '✍️ 판서: 켜짐';
-            drawCanvas.style.pointerEvents = 'auto'; // 판서 켜짐
+            toggleBtn.innerHTML = '판서 ON';
+            drawCanvas.style.pointerEvents = 'auto'; 
         } else {
-            toggleBtn.style.background = '#ffeaa7'; // 노란색
+            toggleBtn.style.background = '#ffeaa7';
             toggleBtn.style.color = '#333';
             toggleBtn.style.borderColor = '#ccc';
-            toggleBtn.innerHTML = '🖌️ 판서: 꺼짐';
-            drawCanvas.style.pointerEvents = 'none'; // 판서 꺼짐 (손가락으로 스크롤 이동 가능해짐)
+            toggleBtn.innerHTML = '판서 OFF';
+            drawCanvas.style.pointerEvents = 'none'; 
         }
     });
 
-    // 상단: 전체 지우기
-    document.getElementById('clear-draw').addEventListener('click', clearDrawing);
-    function clearDrawing() { 
-        drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
-        undoStack = []; 
-    }
+    function clearDrawing() { drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); undoStack = []; }
 
-    // 상단: 실행취소 (Undo) 기능
+    // 되돌리기
     document.getElementById('undo-draw').addEventListener('click', () => {
         if (undoStack.length > 0) {
-            undoStack.pop(); // 방금 그린 것을 버립니다
-            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); // 화면을 싹 지우고
+            undoStack.pop(); 
+            drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height); 
             if (undoStack.length > 0) {
-                // 그 전 상태의 그림을 다시 불러와서 그립니다
                 let img = new Image();
                 img.onload = () => { drawCtx.drawImage(img, 0, 0); };
                 img.src = undoStack[undoStack.length - 1];
@@ -197,31 +187,26 @@
         }
     });
 
-    // 상단: 캡처 버튼 (합성 후 다운로드)
+    // 캡처 다운로드
     document.getElementById('capture-btn').addEventListener('click', () => {
-        // 임시 도화지를 만들어서 PDF와 낙서를 한 장으로 합칩니다.
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = pdfCanvas.width;
         tempCanvas.height = pdfCanvas.height;
         const tempCtx = tempCanvas.getContext('2d');
-
         tempCtx.drawImage(pdfCanvas, 0, 0);
         tempCtx.drawImage(drawCanvas, 0, 0);
 
-        // 이미지 파일로 만들어서 모바일 갤러리로 다운로드 시킵니다.
         const link = document.createElement('a');
-        link.download = `스마트한자_${pageNum}페이지_캡처.png`;
+        link.download = `교재_캡처.png`;
         link.href = tempCanvas.toDataURL('image/png');
         link.click();
     });
 
-    /* ---------- 그리기 이벤트 처리 ---------- */
-    // 마우스
+    // --- 그리기 이벤트 ---
     drawCanvas.addEventListener('mousedown', (e) => { if (!drawMode) return; isDrawing = true; drawCtx.beginPath(); drawCtx.moveTo(e.offsetX, e.offsetY); drawCtx.strokeStyle = 'red'; drawCtx.lineCap = 'round'; drawCtx.lineWidth = 4; });
     drawCanvas.addEventListener('mousemove', (e) => { if (isDrawing && drawMode) { drawCtx.lineTo(e.offsetX, e.offsetY); drawCtx.stroke(); } });
-    drawCanvas.addEventListener('mouseup', () => { if(isDrawing) { isDrawing = false; saveState(); } }); // 선을 다 그리면 저장
+    drawCanvas.addEventListener('mouseup', () => { if(isDrawing) { isDrawing = false; saveState(); } });
     
-    // 모바일 터치
     drawCanvas.addEventListener('touchstart', (e) => { 
         if (!drawMode) return; 
         isDrawing = true; 
@@ -243,10 +228,7 @@
             e.preventDefault(); 
         } 
     });
-    // 터치가 끝날 때마다 상태 저장 (실행취소를 위함)
-    drawCanvas.addEventListener('touchend', (e) => { 
-        if(isDrawing) { isDrawing = false; saveState(); e.preventDefault(); } 
-    });
+    drawCanvas.addEventListener('touchend', (e) => { if(isDrawing) { isDrawing = false; saveState(); e.preventDefault(); } });
 </script>
 </body>
 </html>
