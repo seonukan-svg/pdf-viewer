@@ -10,19 +10,16 @@
         body, html { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; background-color: #333; font-family: sans-serif; }
         .app-layout { display: flex; flex-direction: column; height: 100%; }
         
-        /* [요청 1] 상단 메뉴가 무조건 한 줄로 나오도록 수정 (nowrap) */
         .top-toolbar { display: flex; flex-wrap: nowrap; justify-content: space-evenly; align-items: center; gap: 4px; padding: 8px 4px; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
         
         .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 6px; padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom)); background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; white-space: nowrap; overflow-x: auto; }
         
-        /* [요청 4] 스크롤 영역 안에서 교재가 항상 한가운데 오도록 정렬 방식을 추가했습니다 */
         .canvas-scroll-area { flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background-color: #e2e6ea; }
         
         .canvas-wrapper { position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); background: white; margin: auto; }
         #pdf-canvas { display: block; }
         #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; } 
 
-        /* [요청 3] 한 줄에 들어가도록 버튼 크기와 여백을 콤팩트하게 줄였습니다 */
         button { padding: 6px 10px; font-size: 13px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s;}
         button:active { background: #dcdde1; }
         select { padding: 6px; font-size: 14px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white;}
@@ -38,7 +35,6 @@
 <div class="app-layout">
     
     <div class="top-toolbar">
-        <button id="zoom-in">확대</button>
         <button id="toggle-draw">판서 OFF</button>
         <button id="undo-draw">되돌리기</button>
         <button id="capture-btn">캡처</button>
@@ -53,15 +49,15 @@
 
     <div class="bottom-toolbar">
         <select id="pdf-selector">
-            <option value="./hanja-a.pdf">A 단계</option>
-            <option value="./hanja-b.pdf">B 단계</option>
-            <option value="./hanja-c.pdf">C 단계</option>
-            <option value="./hanja-d1.pdf">D1 단계</option>
-            <option value="./hanja-d2.pdf">D2 단계</option>
-            <option value="./hanja-e1.pdf">E1 단계</option>
-            <option value="./hanja-e2.pdf">E2 단계</option>
-            <option value="./hanja-f1.pdf">F1 단계</option>
-            <option value="./hanja-f2.pdf">F2 단계</option>
+            <option value="./hanja-a.pdf">한자 A</option>
+            <option value="./hanja-b.pdf">한자 B</option>
+            <option value="./hanja-c.pdf">한자 C</option>
+            <option value="./hanja-d1.pdf">한자 D1</option>
+            <option value="./hanja-d2.pdf">한자 D2</option>
+            <option value="./hanja-e1.pdf">한자 E1</option>
+            <option value="./hanja-e2.pdf">한자 E2</option>
+            <option value="./hanja-f1.pdf">한자 F1</option>
+            <option value="./hanja-f2.pdf">한자 F2</option>
         </select>
         <button id="prev-page">◀ 이전</button>
         <div class="page-info">
@@ -107,12 +103,10 @@
         pdfDoc.getPage(num).then(page => {
             const baseViewport = page.getViewport({ scale: 1 });
             
-            // [요청 4] 상하단 메뉴 사이 공간을 100% 활용하여 딱 맞게 계산하는 마법식입니다.
             if (!initialFitDone) {
                 const availableWidth = scrollArea.clientWidth;
                 const availableHeight = scrollArea.clientHeight;
                 
-                // 가로와 세로 중, 더 좁은 쪽을 기준으로 비율을 맞춥니다 (여백 2% 부여)
                 const scaleWidth = availableWidth / baseViewport.width;
                 const scaleHeight = availableHeight / baseViewport.height;
                 currentScale = Math.min(scaleWidth, scaleHeight) * 0.98; 
@@ -133,7 +127,6 @@
         });
     }
 
-    // [요청 5] 기기를 가로 모드로 돌리거나 창 크기가 변할 때, 화면 맞춤을 다시 계산합니다.
     window.addEventListener('resize', () => {
         initialFitDone = false;
         if(pdfDoc) renderPage(pageNum);
@@ -150,9 +143,6 @@
         if(requestedPage >= 1 && requestedPage <= pdfDoc.numPages) { pageNum = requestedPage; renderPage(pageNum); clearDrawing(); }
     });
     
-    // 확대 버튼 (한 번 누를 때마다 30%씩 커집니다)
-    document.getElementById('zoom-in').addEventListener('click', () => { currentScale += 0.3; renderPage(pageNum); });
-
     // 판서 ON/OFF
     const toggleBtn = document.getElementById('toggle-draw');
     toggleBtn.addEventListener('click', () => {
