@@ -19,12 +19,11 @@
         
         #pdf-canvas { display: block; position: relative; z-index: 1; }
         
-        /* 투명 버튼 레이어의 우선순위(z-index)를 명확히 지정했습니다 */
         #annotation-layer { position: absolute; top: 0; left: 0; z-index: 5; }
         .pdf-link { position: absolute; cursor: pointer; display: block; } 
-        /* .pdf-link { background: rgba(255, 0, 0, 0.2); } /* 링크 영역 확인용 (필요시 주석 해제) */
 
-        #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; z-index: 10; } 
+        /* [핵심 수정] 처음 켰을 때부터 판서 도화지가 터치를 방해하지 않도록 pointer-events: none; 을 추가했습니다! */
+        #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; z-index: 10; pointer-events: none; } 
 
         button { padding: 6px 5px; font-size: 12px; letter-spacing: -0.5px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s; flex-shrink: 1; white-space: nowrap; min-width: 0;}
         button:active { background: #dcdde1; }
@@ -205,7 +204,7 @@
             document.getElementById('page-num').value = num;
             undoStack = [];
 
-            // [핵심 변경] 외부 링크(url)와 내부 목차 링크(dest)를 모두 감지합니다.
+            // [핵심 변경] 링크 데이터를 더 강력하고 세밀하게 뽑아옵니다.
             page.getAnnotations().then(annotations => {
                 annotations.forEach(anno => {
                     if (anno.subtype === 'Link') {
@@ -223,26 +222,23 @@
                         link.style.height = h + 'px';
 
                         if (anno.url) {
-                            // 1. 외부 사이트로 가는 링크
                             link.href = anno.url;
                             link.target = '_blank';
                             annoLayer.appendChild(link);
                         } else if (anno.dest) {
-                            // 2. 같은 교재 안에서 페이지를 점프하는 링크 (목차)
                             link.addEventListener('click', (e) => {
-                                e.preventDefault(); // 기본 클릭 동작 막기
+                                e.preventDefault(); 
                                 
-                                // 도착할 페이지 번호를 컴퓨터가 계산하도록 지시합니다.
-                                let getDest = typeof anno.dest === 'string' ? pdfDoc.getDestination(anno.dest) : Promise.resolve(anno.dest);
+                                // 링크의 목적지가 문자열인지 배열인지 확실하게 파악해서 처리합니다.
+                                let destPromise = typeof anno.dest === 'string' ? pdfDoc.getDestination(anno.dest) : Promise.resolve(anno.dest);
                                 
-                                getDest.then(destArray => {
+                                destPromise.then(destArray => {
                                     if (destArray && destArray[0]) {
                                         pdfDoc.getPageIndex(destArray[0]).then(pageIndex => {
-                                            const targetPageNum = pageIndex + 1; // 0부터 세기 때문에 1을 더해줍니다.
-                                            pageNum = targetPageNum;
-                                            renderPage(pageNum); // 해당 페이지로 화면 다시 그리기
+                                            pageNum = pageIndex + 1; 
+                                            renderPage(pageNum); 
                                             clearDrawing();
-                                        });
+                                        }).catch(err => console.log("페이지 찾기 실패:", err));
                                     }
                                 });
                             });
