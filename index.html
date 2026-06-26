@@ -7,74 +7,36 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <style>
-        /* [핵심 1] 모든 요소가 화면 너비(100%)를 절대 넘지 않도록 테두리 계산법을 통일합니다 */
         * { box-sizing: border-box; } 
-        
         body, html { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; background-color: #333; font-family: sans-serif; }
         .app-layout { display: flex; flex-direction: column; height: 100%; width: 100%; }
         
-        /* [핵심 2] justify-content: space-between 으로 버튼들을 양옆으로 고르게 퍼트리고 스크롤을 차단합니다 */
-        .top-toolbar { 
-            display: flex; 
-            flex-wrap: nowrap; 
-            justify-content: space-between; 
-            align-items: center; 
-            gap: 3px; 
-            padding: 8px 4px; 
-            width: 100%; 
-            background: #ffffff; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
-            z-index: 10; 
-            flex-shrink: 0; 
-            overflow: hidden; 
-        }
-        
+        .top-toolbar { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: 2px; padding: 8px 4px; width: 100%; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; overflow: hidden; }
         .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 15px; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); width: 100%; background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; }
         
         .canvas-scroll-area { flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background-color: #e2e6ea; width: 100%; }
-        
         .canvas-wrapper { position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); background: white; margin: auto; }
-        #pdf-canvas { display: block; }
-        #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; } 
-
-        /* [핵심 3] 모바일 한 줄 핏팅을 위해 버튼 사이즈, 폰트, 자간을 초정밀하게 줄였습니다 */
-        button { 
-            padding: 6px 6px; 
-            font-size: 12px; 
-            letter-spacing: -0.5px; 
-            cursor: pointer; 
-            border-radius: 6px; 
-            border: 1px solid #ccc; 
-            background: #f8f9fa; 
-            font-weight: bold; 
-            transition: 0.2s;
-            flex-shrink: 1; 
-            white-space: nowrap; 
-            min-width: 0;
-        }
-        button:active { background: #dcdde1; }
         
-        select { 
-            padding: 6px 2px; 
-            font-size: 12px; 
-            letter-spacing: -0.5px;
-            border-radius: 6px; 
-            border: 1px solid #ccc; 
-            font-weight: bold; 
-            background: white; 
-            cursor: pointer;
-            flex-shrink: 1;
-            min-width: 0;
-            text-overflow: ellipsis;
-        }
+        #pdf-canvas { display: block; }
+        
+        /* [추가] 하이퍼링크 투명 버튼들을 담아둘 투명 필름입니다 */
+        #annotation-layer { position: absolute; top: 0; left: 0; }
+        .pdf-link { position: absolute; cursor: pointer; z-index: 5; } /* 투명 링크 버튼 */
+        /* .pdf-link:hover { background: rgba(255, 255, 0, 0.2); } /* (테스트용) 링크 위치를 눈으로 보고 싶으시면 이 줄의 맨 앞 주석(/*)을 지워보세요 */
+
+        #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; z-index: 10; } 
+
+        button { padding: 6px 5px; font-size: 12px; letter-spacing: -0.5px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s; flex-shrink: 1; white-space: nowrap; min-width: 0;}
+        button:active { background: #dcdde1; }
+        select { padding: 6px 2px; font-size: 12px; letter-spacing: -0.5px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white; cursor: pointer; flex-shrink: 1; min-width: 0; text-overflow: ellipsis;}
         
         .page-info { font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
         .page-info input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 40px; text-align: center; font-size: 14px;}
-        
         .divider { width: 1px; height: 20px; background-color: #ccc; margin: 0 1px; flex-shrink: 0; }
 
         #toggle-draw { border: 2px solid #ccc; background: #ffeaa7; color: #333; }
         #capture-btn { background: #74b9ff; color: white; border: none; }
+        #update-btn { background: #ff7675; color: white; border: none; } 
     </style>
 </head>
 <body>
@@ -87,7 +49,6 @@
             <option value="english">영어</option>
             <option value="science">과학</option>
         </select>
-        
         <select id="stage-selector"></select>
 
         <div class="divider"></div>
@@ -95,11 +56,13 @@
         <button id="toggle-draw">판서 OFF</button>
         <button id="undo-draw">되돌리기</button>
         <button id="capture-btn">캡처</button>
+        <button id="update-btn">🔄 최신화</button>
     </div>
 
     <div class="canvas-scroll-area" id="scroll-area">
         <div class="canvas-wrapper">
             <canvas id="pdf-canvas"></canvas>
+            <div id="annotation-layer"></div>
             <canvas id="draw-canvas"></canvas>
         </div>
     </div>
@@ -139,6 +102,7 @@
     const ctx = pdfCanvas.getContext('2d');
     const drawCanvas = document.getElementById('draw-canvas');
     const drawCtx = drawCanvas.getContext('2d');
+    const annoLayer = document.getElementById('annotation-layer'); // 링크 레이어 연결
     const scrollArea = document.getElementById('scroll-area');
     const subjectSelector = document.getElementById('subject-selector');
     const stageSelector = document.getElementById('stage-selector');
@@ -160,19 +124,45 @@
         });
     }
 
-    function loadPDF(pdfUrl) {
+    async function loadPDF(pdfUrl) {
         pageNum = 1; 
         initialFitDone = false; 
         clearDrawing(); 
+        annoLayer.innerHTML = ''; // 페이지가 바뀌면 기존 링크 지우기
         
-        pdfjsLib.getDocument(pdfUrl).promise.then(pdfDoc_ => {
-            pdfDoc = pdfDoc_;
-            document.getElementById('page-count').textContent = pdfDoc.numPages;
-            renderPage(pageNum);
-        }).catch(error => {
-            alert(`"${pdfUrl}" 파일을 찾을 수 없습니다. 깃허브에 해당 PDF 파일을 업로드 해주세요!`);
-        });
+        try {
+            const cache = await caches.open('smart-edu-cache-v1');
+            let response = await cache.match(pdfUrl);
+
+            if (!response) {
+                response = await fetch(pdfUrl);
+                if (!response.ok) throw new Error("네트워크 오류");
+                await cache.put(pdfUrl, response.clone());
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            const typedArray = new Uint8Array(arrayBuffer);
+
+            pdfjsLib.getDocument({ data: typedArray }).promise.then(pdfDoc_ => {
+                pdfDoc = pdfDoc_;
+                document.getElementById('page-count').textContent = pdfDoc.numPages;
+                renderPage(pageNum);
+            }).catch(error => {
+                alert("PDF 데이터를 해석하는 데 실패했습니다.");
+            });
+
+        } catch (error) {
+            alert(`"${pdfUrl}" 파일을 찾을 수 없습니다.`);
+        }
     }
+
+    document.getElementById('update-btn').addEventListener('click', async () => {
+        if(confirm("기기에 저장된 모든 교재 데이터를 지우고 최신 버전으로 새로고침 하시겠습니까?")) {
+            await caches.delete('smart-edu-cache-v1'); 
+            alert("초기화 완료! 웹페이지를 다시 시작합니다.");
+            location.reload(); 
+        }
+    });
 
     function renderPage(num) {
         pdfDoc.getPage(num).then(page => {
@@ -190,15 +180,24 @@
             const viewport = page.getViewport({ scale: currentScale });
             const outputScale = window.devicePixelRatio || 1;
 
+            // 캔버스 크기 맞춤
             pdfCanvas.width = Math.floor(viewport.width * outputScale);
             pdfCanvas.height = Math.floor(viewport.height * outputScale);
             drawCanvas.width = Math.floor(viewport.width * outputScale);
             drawCanvas.height = Math.floor(viewport.height * outputScale);
 
-            pdfCanvas.style.width = Math.floor(viewport.width) + "px";
-            pdfCanvas.style.height = Math.floor(viewport.height) + "px";
-            drawCanvas.style.width = Math.floor(viewport.width) + "px";
-            drawCanvas.style.height = Math.floor(viewport.height) + "px";
+            const displayWidth = Math.floor(viewport.width) + "px";
+            const displayHeight = Math.floor(viewport.height) + "px";
+
+            pdfCanvas.style.width = displayWidth;
+            pdfCanvas.style.height = displayHeight;
+            drawCanvas.style.width = displayWidth;
+            drawCanvas.style.height = displayHeight;
+            
+            // [추가] 투명 필름의 크기를 PDF 화면 크기와 똑같이 맞춥니다.
+            annoLayer.style.width = displayWidth;
+            annoLayer.style.height = displayHeight;
+            annoLayer.innerHTML = ''; // 페이지 넘길 때 이전 페이지 링크 청소
 
             const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
 
@@ -207,6 +206,32 @@
 
             document.getElementById('page-num').value = num;
             undoStack = [];
+
+            // [핵심 추가] 원래 PDF에 있던 하이퍼링크 위치를 추출해서 투명 버튼 만들기
+            page.getAnnotations().then(annotations => {
+                annotations.forEach(anno => {
+                    if (anno.subtype === 'Link' && anno.url) {
+                        // PDF 속의 좌표를 현재 모바일 화면 크기에 맞게 환산
+                        const rect = viewport.convertToViewportRectangle(anno.rect);
+                        const x = Math.min(rect[0], rect[2]);
+                        const y = Math.min(rect[1], rect[3]);
+                        const w = Math.abs(rect[2] - rect[0]);
+                        const h = Math.abs(rect[3] - rect[1]);
+
+                        // 투명 <a> 태그(버튼) 생성
+                        const link = document.createElement('a');
+                        link.href = anno.url;
+                        link.target = '_blank'; // 새 창으로 열기
+                        link.className = 'pdf-link';
+                        link.style.left = x + 'px';
+                        link.style.top = y + 'px';
+                        link.style.width = w + 'px';
+                        link.style.height = h + 'px';
+
+                        annoLayer.appendChild(link);
+                    }
+                });
+            });
         });
     }
 
