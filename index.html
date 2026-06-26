@@ -15,8 +15,11 @@
         .spinner { border: 5px solid rgba(255,255,255,0.2); border-top: 5px solid #74b9ff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* [몰입 모드] 화면 터치 시 메뉴가 사라지는 마법 코드 */
+        .immersive .top-toolbar, .immersive .bottom-toolbar { display: none !important; }
+
         .top-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 8px; padding: 10px 5px; width: 100%; background: #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; overflow-x: auto; }
-        .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 15px; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); width: 100%; background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; }
+        .bottom-toolbar { display: flex; flex-wrap: nowrap; justify-content: center; align-items: center; gap: 10px; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); width: 100%; background: #ffffff; box-shadow: 0 -2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; }
         
         .canvas-scroll-area { flex-grow: 1; overflow: auto; display: flex; justify-content: center; align-items: center; background-color: #e2e6ea; width: 100%; }
         .canvas-wrapper { position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.3); background: white; margin: auto; }
@@ -26,12 +29,16 @@
         .pdf-link { position: absolute; cursor: pointer; display: block; -webkit-tap-highlight-color: rgba(116, 185, 255, 0.4); } 
         #draw-canvas { position: absolute; top: 0; left: 0; cursor: crosshair; touch-action: none; z-index: 10; pointer-events: none; } 
 
-        button { padding: 6px 5px; font-size: 12px; letter-spacing: -0.5px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s; flex-shrink: 1; white-space: nowrap; min-width: 0;}
+        button { padding: 6px 5px; font-size: 12px; letter-spacing: -0.5px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8f9fa; font-weight: bold; transition: 0.2s; flex-shrink: 0; white-space: nowrap;}
         button:active { background: #dcdde1; }
         select { padding: 6px 2px; font-size: 12px; letter-spacing: -0.5px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; background: white; cursor: pointer; flex-shrink: 1; min-width: 0; text-overflow: ellipsis;}
         
-        .page-info { font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
-        .page-info input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 40px; text-align: center; font-size: 14px;}
+        /* [슬라이더 디자인] 동영상 넘기듯 탐색하는 막대기 */
+        #page-slider { -webkit-appearance: none; flex-grow: 1; height: 6px; background: #dcdde1; border-radius: 5px; outline: none; margin: 0 5px;}
+        #page-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #74b9ff; cursor: pointer; }
+
+        .page-info { font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 3px; flex-shrink: 0;}
+        .page-info input { padding: 5px; border: 1px solid #ccc; border-radius: 4px; width: 35px; text-align: center; font-size: 13px;}
         .divider { width: 1px; height: 20px; background-color: #ccc; margin: 0 1px; flex-shrink: 0; }
 
         #toggle-draw { border: 2px solid #ccc; background: #ffeaa7; color: #333; }
@@ -73,11 +80,13 @@
     </div>
 
     <div class="bottom-toolbar">
-        <button id="prev-page">◀ 이전</button>
+        <button id="prev-page">◀</button>
+        <!-- 빠른 탐색 슬라이더 -->
+        <input type="range" id="page-slider" min="1" max="1" value="1">
         <div class="page-info">
             <input type="number" id="page-num" value="1"> / <span id="page-count">0</span>
         </div>
-        <button id="next-page">다음 ▶</button>
+        <button id="next-page">▶</button>
     </div>
 </div>
 
@@ -101,8 +110,9 @@
 
     let pdfDoc = null, pageNum = 1;
     let currentScale = 1.0; 
+    let fitScale = 1.0; // 스와이프 방지용 기준 해상도
     let initialFitDone = false; 
-    let currentPdfUrl = ""; // [추가] 현재 열려있는 PDF의 주소를 기억할 변수
+    let currentPdfUrl = ""; 
 
     const pdfCanvas = document.getElementById('pdf-canvas');
     const ctx = pdfCanvas.getContext('2d');
@@ -112,6 +122,7 @@
     const scrollArea = document.getElementById('scroll-area');
     const subjectSelector = document.getElementById('subject-selector');
     const stageSelector = document.getElementById('stage-selector');
+    const pageSlider = document.getElementById('page-slider');
     
     const loadingScreen = document.getElementById('loading-screen');
     const loadingText = document.getElementById('loading-text');
@@ -128,7 +139,16 @@
     let drawMode = false;
     let undoStack = [];
 
-    function saveState() { undoStack.push(drawCanvas.toDataURL()); }
+    // [기능 2: 판서 자동 저장]
+    function saveState() { 
+        const dataUrl = drawCanvas.toDataURL();
+        undoStack.push(dataUrl); 
+        try {
+            localStorage.setItem('draw_' + currentPdfUrl + '_' + pageNum, dataUrl);
+        } catch(e) {
+            console.warn("기기 용량 부족으로 판서가 영구저장되지 않았습니다.");
+        }
+    }
 
     function updateStageList(subjectKey) {
         stageSelector.innerHTML = ''; 
@@ -143,15 +163,13 @@
 
     async function loadPDF(pdfUrl) {
         showLoading("교재 데이터를 다운로드 중입니다..."); 
+        currentPdfUrl = pdfUrl; 
         
-        currentPdfUrl = pdfUrl; // 현재 PDF 주소 업데이트
-        
-        // [핵심 1] 기억 수첩에서 이 교재를 마지막으로 몇 페이지까지 봤는지 꺼내옵니다.
         const savedPage = localStorage.getItem('lastPage_' + pdfUrl);
-        pageNum = savedPage ? parseInt(savedPage) : 1; // 기록이 있으면 그 페이지로, 없으면 1페이지로 설정
+        pageNum = savedPage ? parseInt(savedPage) : 1; 
         
         initialFitDone = false; 
-        clearDrawing(); 
+        clearDrawingBase(); // 캐시 지우기 방지용 내부함수 호출
         annoLayer.innerHTML = ''; 
         
         try {
@@ -170,10 +188,9 @@
             pdfjsLib.getDocument({ data: typedArray }).promise.then(pdfDoc_ => {
                 pdfDoc = pdfDoc_;
                 document.getElementById('page-count').textContent = pdfDoc.numPages;
+                pageSlider.max = pdfDoc.numPages; // 슬라이더 길이 맞춤
                 
-                // 만약 기억 수첩의 페이지 번호가 실제 교재 장수보다 크면(오류 방지) 마지막 페이지로 조정
                 if(pageNum > pdfDoc.numPages) pageNum = pdfDoc.numPages;
-                
                 renderPage(pageNum);
             }).catch(error => {
                 hideLoading();
@@ -187,10 +204,9 @@
     }
 
     document.getElementById('update-btn').addEventListener('click', async () => {
-        if(confirm("기기에 저장된 모든 교재 데이터를 지우고 최신 버전으로 새로고침 하시겠습니까?")) {
+        if(confirm("기기에 저장된 모든 교재 데이터 및 판서 기록을 지우고 최신화 하시겠습니까?")) {
             showLoading("초기화 중입니다...");
             await caches.delete('smart-edu-cache-v1'); 
-            // 초기화 할 때 기억 수첩도 깨끗하게 비워줍니다
             localStorage.clear();
             location.reload(); 
         }
@@ -198,8 +214,6 @@
 
     function renderPage(num) {
         showLoading("화면을 그리는 중입니다..."); 
-        
-        // [핵심 2] 화면이 바뀔 때마다 지금 보고 있는 페이지를 기억 수첩에 적어둡니다.
         localStorage.setItem('lastPage_' + currentPdfUrl, num);
         
         pdfDoc.getPage(num).then(page => {
@@ -211,6 +225,7 @@
                 const scaleWidth = availableWidth / baseViewport.width;
                 const scaleHeight = availableHeight / baseViewport.height;
                 currentScale = Math.min(scaleWidth, scaleHeight) * 0.98; 
+                fitScale = currentScale; // 기본 해상도 기억 (스와이프 작동 조건)
                 initialFitDone = true; 
             }
 
@@ -241,7 +256,18 @@
                 
                 drawCtx.scale(outputScale, outputScale);
                 document.getElementById('page-num').value = num;
-                undoStack = [];
+                pageSlider.value = num; // 슬라이더 위치 동기화
+                
+                clearDrawingBase(); // 캔버스 지우기
+                
+                // [기능 2: 판서 자동 불러오기]
+                const savedDraw = localStorage.getItem('draw_' + currentPdfUrl + '_' + num);
+                if (savedDraw) {
+                    let img = new Image();
+                    img.onload = () => { drawCtx.drawImage(img, 0, 0, drawCanvas.width / outputScale, drawCanvas.height / outputScale); };
+                    img.src = savedDraw;
+                    undoStack.push(savedDraw);
+                }
 
                 page.getAnnotations().then(annotations => {
                     annotations.forEach(anno => {
@@ -270,7 +296,6 @@
                                         if (pMatch && pMatch[1]) {
                                             pageNum = parseInt(pMatch[1]);
                                             renderPage(pageNum);
-                                            clearDrawing();
                                         }
                                     });
                                 } else {
@@ -301,12 +326,9 @@
                                             if (pageIndex !== undefined && pageIndex >= 0) {
                                                 pageNum = pageIndex + 1; 
                                                 renderPage(pageNum); 
-                                                clearDrawing();
                                             }
                                         }
-                                    } catch (err) {
-                                        console.log("페이지 이동 에러");
-                                    }
+                                    } catch (err) {}
                                 });
                                 annoLayer.appendChild(link);
                             }
@@ -321,41 +343,40 @@
 
     window.addEventListener('resize', () => { initialFitDone = false; if(pdfDoc) renderPage(pageNum); });
 
-    // [핵심 3] 앱이 처음 켜질 때, 기억 수첩에서 마지막으로 보던 과목과 단계를 불러옵니다.
     const savedSubject = localStorage.getItem('lastSubject');
-    if (savedSubject && subjectData[savedSubject]) {
-        subjectSelector.value = savedSubject;
-    }
+    if (savedSubject && subjectData[savedSubject]) { subjectSelector.value = savedSubject; }
     
     updateStageList(subjectSelector.value); 
     
     const savedStage = localStorage.getItem('lastStage');
-    // 불러온 단계가 현재 과목 목록에 실제로 존재하는지 확인 (오류 방지)
     const stageExists = Array.from(stageSelector.options).some(opt => opt.value === savedStage);
-    if (savedStage && stageExists) {
-        stageSelector.value = savedStage;
-    }
+    if (savedStage && stageExists) { stageSelector.value = savedStage; }
 
     loadPDF(stageSelector.value); 
 
-    // 사용자가 메뉴를 바꿀 때마다 기억 수첩을 업데이트합니다.
     subjectSelector.addEventListener('change', (e) => { 
-        localStorage.setItem('lastSubject', e.target.value); // 과목 기억
+        localStorage.setItem('lastSubject', e.target.value); 
         updateStageList(e.target.value); 
-        localStorage.setItem('lastStage', stageSelector.value); // 단계도 첫 번째로 리셋 기억
+        localStorage.setItem('lastStage', stageSelector.value); 
         loadPDF(stageSelector.value); 
     });
     
     stageSelector.addEventListener('change', (e) => { 
-        localStorage.setItem('lastStage', e.target.value); // 단계 기억
+        localStorage.setItem('lastStage', e.target.value); 
         loadPDF(e.target.value); 
     });
     
-    document.getElementById('prev-page').addEventListener('click', () => { if (pageNum <= 1) return; pageNum--; renderPage(pageNum); clearDrawing(); });
-    document.getElementById('next-page').addEventListener('click', () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); clearDrawing(); });
+    document.getElementById('prev-page').addEventListener('click', () => { if (pageNum <= 1) return; pageNum--; renderPage(pageNum); });
+    document.getElementById('next-page').addEventListener('click', () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); });
     document.getElementById('page-num').addEventListener('change', (e) => {
         const requestedPage = parseInt(e.target.value);
-        if(requestedPage >= 1 && requestedPage <= pdfDoc.numPages) { pageNum = requestedPage; renderPage(pageNum); clearDrawing(); }
+        if(requestedPage >= 1 && requestedPage <= pdfDoc.numPages) { pageNum = requestedPage; renderPage(pageNum); }
+    });
+    
+    // [기능 3: 빠른 탐색 슬라이더 제어]
+    pageSlider.addEventListener('change', (e) => {
+        pageNum = parseInt(e.target.value);
+        renderPage(pageNum);
     });
     
     const toggleBtn = document.getElementById('toggle-draw');
@@ -367,6 +388,7 @@
             toggleBtn.style.borderColor = '#d63031';
             toggleBtn.innerHTML = '판서 ON';
             drawCanvas.style.pointerEvents = 'auto'; 
+            document.querySelector('.app-layout').classList.remove('immersive'); // 판서 켜면 메뉴 보이게
         } else {
             toggleBtn.style.background = '#ffeaa7';
             toggleBtn.style.color = '#333';
@@ -376,12 +398,14 @@
         }
     });
 
-    function clearDrawing() { 
+    // 내부 도화지 리셋 (데이터 유지용)
+    function clearDrawingBase() {
         const outputScale = window.devicePixelRatio || 1;
         drawCtx.clearRect(0, 0, drawCanvas.width / outputScale, drawCanvas.height / outputScale); 
         undoStack = []; 
     }
 
+    // 되돌리기 로직 (데이터 삭제 로직 연동)
     document.getElementById('undo-draw').addEventListener('click', () => {
         if (undoStack.length > 0) {
             undoStack.pop(); 
@@ -391,6 +415,9 @@
                 let img = new Image();
                 img.onload = () => { drawCtx.drawImage(img, 0, 0, drawCanvas.width / outputScale, drawCanvas.height / outputScale); };
                 img.src = undoStack[undoStack.length - 1];
+                try { localStorage.setItem('draw_' + currentPdfUrl + '_' + pageNum, undoStack[undoStack.length - 1]); } catch(e){}
+            } else {
+                localStorage.removeItem('draw_' + currentPdfUrl + '_' + pageNum); // 다 지웠으면 수첩에서도 삭제
             }
         }
     });
@@ -412,10 +439,47 @@
         link.click();
     });
 
+    // --- 터치 및 스와이프 이벤트 ---
+    let touchStartX = 0;
+    let touchStartY = 0;
+    
+    // [기능 4: 몰입 모드 (화면 터치)]
+    annoLayer.addEventListener('click', (e) => {
+        if(e.target === annoLayer) {
+            document.querySelector('.app-layout').classList.toggle('immersive');
+        }
+    });
+
     drawCanvas.addEventListener('mousedown', (e) => { if (!drawMode) return; isDrawing = true; drawCtx.beginPath(); drawCtx.moveTo(e.offsetX, e.offsetY); drawCtx.strokeStyle = 'red'; drawCtx.lineCap = 'round'; drawCtx.lineWidth = 4; });
     drawCanvas.addEventListener('mousemove', (e) => { if (isDrawing && drawMode) { drawCtx.lineTo(e.offsetX, e.offsetY); drawCtx.stroke(); } });
     drawCanvas.addEventListener('mouseup', () => { if(isDrawing) { isDrawing = false; saveState(); } });
     
+    annoLayer.addEventListener('touchstart', (e) => { 
+        touchStartX = e.changedTouches[0].screenX; 
+        touchStartY = e.changedTouches[0].screenY; 
+    }, {passive: true});
+    
+    // [기능 1: 스와이프 페이지 이동]
+    annoLayer.addEventListener('touchend', (e) => { 
+        if (drawMode) return; // 판서 중에는 무시
+        if (currentScale > fitScale + 0.1) return; // 확대해서 패닝 중일 때는 무시
+        
+        let touchEndX = e.changedTouches[0].screenX;
+        let touchEndY = e.changedTouches[0].screenY;
+        
+        // 위아래로 스크롤하는 동작이면 무시
+        if (Math.abs(touchEndY - touchStartY) > 50) return;
+        
+        if (touchEndX < touchStartX - 60) {
+            // 왼쪽으로 스와이프 -> 다음 장
+            if (pageNum < pdfDoc.numPages) { pageNum++; renderPage(pageNum); }
+        }
+        if (touchEndX > touchStartX + 60) {
+            // 오른쪽으로 스와이프 -> 이전 장
+            if (pageNum > 1) { pageNum--; renderPage(pageNum); }
+        }
+    }, {passive: true});
+
     drawCanvas.addEventListener('touchstart', (e) => { 
         if (!drawMode) return; 
         isDrawing = true; 
