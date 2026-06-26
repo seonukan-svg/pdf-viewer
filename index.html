@@ -11,7 +11,6 @@
         body, html { margin: 0; padding: 0; height: 100%; height: 100dvh; overflow: hidden; background-color: #333; font-family: sans-serif; }
         .app-layout { display: flex; flex-direction: column; height: 100%; width: 100%; }
         
-        /* 로딩 화면 디자인 (화면 전체를 검은 반투명으로 덮고 빙글빙글 도는 원을 보여줍니다) */
         #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; color: white; font-weight: bold; font-size: 15px; }
         .spinner { border: 5px solid rgba(255,255,255,0.2); border-top: 5px solid #74b9ff; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -51,6 +50,9 @@
     <div class="top-toolbar">
         <select id="subject-selector">
             <option value="hanja">한자</option>
+            <option value="isu">이수</option>
+            <option value="english">영어</option>
+            <option value="science">과학</option>
         </select>
         <select id="stage-selector"></select>
 
@@ -100,6 +102,7 @@
     let pdfDoc = null, pageNum = 1;
     let currentScale = 1.0; 
     let initialFitDone = false; 
+    let currentPdfUrl = ""; // [추가] 현재 열려있는 PDF의 주소를 기억할 변수
 
     const pdfCanvas = document.getElementById('pdf-canvas');
     const ctx = pdfCanvas.getContext('2d');
@@ -110,7 +113,6 @@
     const subjectSelector = document.getElementById('subject-selector');
     const stageSelector = document.getElementById('stage-selector');
     
-    // 로딩 화면 제어
     const loadingScreen = document.getElementById('loading-screen');
     const loadingText = document.getElementById('loading-text');
 
@@ -140,8 +142,14 @@
     }
 
     async function loadPDF(pdfUrl) {
-        showLoading("데이터 로딩중입니다..."); // 로딩 시작
-        pageNum = 1; 
+        showLoading("교재 데이터를 다운로드 중입니다..."); 
+        
+        currentPdfUrl = pdfUrl; // 현재 PDF 주소 업데이트
+        
+        // [핵심 1] 기억 수첩에서 이 교재를 마지막으로 몇 페이지까지 봤는지 꺼내옵니다.
+        const savedPage = localStorage.getItem('lastPage_' + pdfUrl);
+        pageNum = savedPage ? parseInt(savedPage) : 1; // 기록이 있으면 그 페이지로, 없으면 1페이지로 설정
+        
         initialFitDone = false; 
         clearDrawing(); 
         annoLayer.innerHTML = ''; 
@@ -162,6 +170,10 @@
             pdfjsLib.getDocument({ data: typedArray }).promise.then(pdfDoc_ => {
                 pdfDoc = pdfDoc_;
                 document.getElementById('page-count').textContent = pdfDoc.numPages;
+                
+                // 만약 기억 수첩의 페이지 번호가 실제 교재 장수보다 크면(오류 방지) 마지막 페이지로 조정
+                if(pageNum > pdfDoc.numPages) pageNum = pdfDoc.numPages;
+                
                 renderPage(pageNum);
             }).catch(error => {
                 hideLoading();
@@ -175,15 +187,20 @@
     }
 
     document.getElementById('update-btn').addEventListener('click', async () => {
-        if(confirm("교재를 최신 버전으로 새로고침 하시겠습니까?")) {
+        if(confirm("기기에 저장된 모든 교재 데이터를 지우고 최신 버전으로 새로고침 하시겠습니까?")) {
             showLoading("초기화 중입니다...");
             await caches.delete('smart-edu-cache-v1'); 
+            // 초기화 할 때 기억 수첩도 깨끗하게 비워줍니다
+            localStorage.clear();
             location.reload(); 
         }
     });
 
     function renderPage(num) {
-        showLoading("화면을 그리는 중입니다..."); // 페이지 이동 시에도 잠깐 띄웁니다
+        showLoading("화면을 그리는 중입니다..."); 
+        
+        // [핵심 2] 화면이 바뀔 때마다 지금 보고 있는 페이지를 기억 수첩에 적어둡니다.
+        localStorage.setItem('lastPage_' + currentPdfUrl, num);
         
         pdfDoc.getPage(num).then(page => {
             const baseViewport = page.getViewport({ scale: 1 });
@@ -219,7 +236,6 @@
 
             const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
 
-            // [핵심 변경] 그림 그리기가 '완전히 끝나면' 로딩창을 끄도록 설정했습니다.
             const renderTask = page.render({ canvasContext: ctx, transform: transform, viewport: viewport });
             renderTask.promise.then(() => {
                 
@@ -227,7 +243,6 @@
                 document.getElementById('page-num').value = num;
                 undoStack = [];
 
-                // 링크 추적
                 page.getAnnotations().then(annotations => {
                     annotations.forEach(anno => {
                         if (anno.subtype === 'Link') {
@@ -298,7 +313,6 @@
                         }
                     });
                     
-                    // 모든 작업이 끝나면 로딩 애니메이션을 끕니다!
                     hideLoading(); 
                 });
             });
@@ -307,11 +321,36 @@
 
     window.addEventListener('resize', () => { initialFitDone = false; if(pdfDoc) renderPage(pageNum); });
 
+    // [핵심 3] 앱이 처음 켜질 때, 기억 수첩에서 마지막으로 보던 과목과 단계를 불러옵니다.
+    const savedSubject = localStorage.getItem('lastSubject');
+    if (savedSubject && subjectData[savedSubject]) {
+        subjectSelector.value = savedSubject;
+    }
+    
     updateStageList(subjectSelector.value); 
+    
+    const savedStage = localStorage.getItem('lastStage');
+    // 불러온 단계가 현재 과목 목록에 실제로 존재하는지 확인 (오류 방지)
+    const stageExists = Array.from(stageSelector.options).some(opt => opt.value === savedStage);
+    if (savedStage && stageExists) {
+        stageSelector.value = savedStage;
+    }
+
     loadPDF(stageSelector.value); 
 
-    subjectSelector.addEventListener('change', (e) => { updateStageList(e.target.value); loadPDF(stageSelector.value); });
-    stageSelector.addEventListener('change', (e) => { loadPDF(e.target.value); });
+    // 사용자가 메뉴를 바꿀 때마다 기억 수첩을 업데이트합니다.
+    subjectSelector.addEventListener('change', (e) => { 
+        localStorage.setItem('lastSubject', e.target.value); // 과목 기억
+        updateStageList(e.target.value); 
+        localStorage.setItem('lastStage', stageSelector.value); // 단계도 첫 번째로 리셋 기억
+        loadPDF(stageSelector.value); 
+    });
+    
+    stageSelector.addEventListener('change', (e) => { 
+        localStorage.setItem('lastStage', e.target.value); // 단계 기억
+        loadPDF(e.target.value); 
+    });
+    
     document.getElementById('prev-page').addEventListener('click', () => { if (pageNum <= 1) return; pageNum--; renderPage(pageNum); clearDrawing(); });
     document.getElementById('next-page').addEventListener('click', () => { if (pageNum >= pdfDoc.numPages) return; pageNum++; renderPage(pageNum); clearDrawing(); });
     document.getElementById('page-num').addEventListener('change', (e) => {
