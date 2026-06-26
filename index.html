@@ -51,9 +51,6 @@
     <div class="top-toolbar">
         <select id="subject-selector">
             <option value="hanja">한자</option>
-            <option value="isu">이수</option>
-            <option value="english">영어</option>
-            <option value="science">과학</option>
         </select>
         <select id="stage-selector"></select>
 
@@ -143,7 +140,7 @@
     }
 
     async function loadPDF(pdfUrl) {
-        showLoading("교재 데이터를 다운로드 중입니다..."); // 로딩 시작
+        showLoading("데이터 로딩중입니다..."); // 로딩 시작
         pageNum = 1; 
         initialFitDone = false; 
         clearDrawing(); 
@@ -178,7 +175,7 @@
     }
 
     document.getElementById('update-btn').addEventListener('click', async () => {
-        if(confirm("기기에 저장된 모든 교재 데이터를 지우고 최신 버전으로 새로고침 하시겠습니까?")) {
+        if(confirm("교재를 최신 버전으로 새로고침 하시겠습니까?")) {
             showLoading("초기화 중입니다...");
             await caches.delete('smart-edu-cache-v1'); 
             location.reload(); 
